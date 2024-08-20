@@ -4,9 +4,14 @@ from django.template import loader
 from django.http import Http404
 from django.views import View
 
-from .models import Questions_Inventory
+from .models import Questions_Inventory, QuizLevel, Quiz
+from .serializer import serialize_questions, serialize_quiz
+
+import logging
 
 # class QuestionsView(View):
+
+logger = logging.getLogger(__name__)
 
 def index(request):
     return HttpResponse("Hello, world. You're at the polls index.")
@@ -18,6 +23,27 @@ def question(request, question_id):
         'status': 'success',
     }
     return JsonResponse(data, status=200)
+
+def questions_all(request, course_id):
+    logger.debug('in questions all')
+    latest_question_list = Questions_Inventory.objects.order_by("-created_at")[:5]
+    logger.debug(latest_question_list)
+    results = {
+        "questions" : serialize_questions(latest_question_list)
+    }
+    logger.debug(results)
+    return JsonResponse(results, status=200)
+
+def quizForLevel(request, level):
+    questions = Quiz.objects.filter(quiz_level_id=level)
+    # order_by("-created_at")[:5]
+    # filter(quiz_level_id=level)
+    logger.debug(questions)
+    results = {
+        "questions" : serialize_quiz(questions)
+    }
+    logger.debug(results)
+    return JsonResponse(results, status=200)
 
 def questionView(request, question_id):
     question = get_object_or_404(Questions_Inventory, pk=question_id)
