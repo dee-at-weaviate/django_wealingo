@@ -39,6 +39,15 @@ def serialize_quiz(questions):
     logger.debug(serialize_quiz)    
     return serialize_quiz
 
+def serialize_leaderboard(leaderboard):
+    serialize_leaderboard = []
+    for position in leaderboard:
+        serialize_leaderboard.append({
+            'xp' : position.xp,
+            'user_id' : position.user_id_id
+        })
+    return serialize_leaderboard    
+
 def serialize_questions(questions):
     serialize_questions = []
     logger.info(len(questions))

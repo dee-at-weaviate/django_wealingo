@@ -1,13 +1,15 @@
 from django.shortcuts import get_object_or_404,render
+from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse,JsonResponse
 from django.template import loader
 from django.http import Http404
 from django.views import View
-
-from .models import Questions_Inventory, QuizLevel, Quiz
-from .serializer import serialize_questions, serialize_quiz
+from django.db.models import F
+from .models import Questions_Inventory, QuizLevel, Quiz, Leaderboard, User_Profile
+from .serializer import serialize_questions, serialize_quiz, serialize_leaderboard
 
 import logging
+import json
 
 # class QuestionsView(View):
 
@@ -41,6 +43,55 @@ def quizForLevel(request, level):
     logger.debug(questions)
     results = {
         "questions" : serialize_quiz(questions)
+    }
+    logger.debug(results)
+    return JsonResponse(results, status=200)
+
+@csrf_exempt 
+def submitScore(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            # logger.info(data)
+        except json.JSONDecodeError:
+            logger.info('error')
+            return JsonResponse({"error": "Invalid JSON"}, status=400)        
+        user_id = data.get('user_id')
+        new_score = data.get('totalScore')
+        logger.info(user_id)
+        logger.info(new_score)
+        if user_id is None or new_score is None:
+            return JsonResponse({"error": "user_id and totalScore are required"}, status=400)
+        
+        user_profile = get_object_or_404(User_Profile, pk=user_id)
+        logger.info(user_profile)
+
+        leaderboard_entry, created = Leaderboard.objects.get_or_create(
+                                        user_id=user_profile,
+                                        defaults={'xp': new_score} 
+                                    )
+
+        if not created:
+            leaderboard_entry.xp = F('xp') + new_score
+            leaderboard_entry.save()
+            leaderboard_entry.refresh_from_db()
+
+        if created:
+            leaderboard_entry.save()
+
+        logger.info(leaderboard_entry)
+        logger.info('response')
+        return JsonResponse({"message": "Score updated successfully", "new_total_xp": leaderboard_entry.xp})
+    else:
+        logger.info('error method')
+    return HttpResponse(status=405) 
+
+def showLeaderBoard(request):
+    logger.debug('in show leaderbaoard')
+    latest_leaderboard = Leaderboard.objects.order_by("-xp")[:15]
+    logger.debug(latest_leaderboard)
+    results = {
+        "leaderboard" : serialize_leaderboard(latest_leaderboard)
     }
     logger.debug(results)
     return JsonResponse(results, status=200)
