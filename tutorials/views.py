@@ -89,6 +89,9 @@ def submitScore(request):
 def showLeaderBoard(request):
     logger.debug('in show leaderbaoard')
     latest_leaderboard = Leaderboard.objects.order_by("-xp")[:15]
+    # latest_leaderboard = Leaderboard.objects.select_related('user_id').order_by('-xp')[:15]
+    for entry in latest_leaderboard:
+        logger.info(entry.xp, entry.user_id.username, entry.user_id.user_id)
     logger.debug(latest_leaderboard)
     results = {
         "leaderboard" : serialize_leaderboard(latest_leaderboard)
