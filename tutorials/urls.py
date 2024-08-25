@@ -10,5 +10,6 @@ urlpatterns = [
     path("questions/view/all", views.questionsAllView, name="question_all_view"),
     path("quiz/level/<uuid:level>", views.quizForLevel, name="quiz_for_level" ),
     path('quiz/score', views.submitScore, name='submit_score'),
+    path('user/new', views.createUser, name='create_user'),
     path('leaderboard', views.showLeaderBoard, name='show_leaderboard')
 ]

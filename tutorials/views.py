@@ -6,6 +6,7 @@ from django.http import Http404
 from django.views import View
 from django.db.models import F
 from .models import Questions_Inventory, QuizLevel, Quiz, Leaderboard, User_Profile
+from django.db import IntegrityError, DatabaseError
 from .serializer import serialize_questions, serialize_quiz, serialize_leaderboard
 
 import logging
@@ -46,6 +47,38 @@ def quizForLevel(request, level):
     }
     logger.debug(results)
     return JsonResponse(results, status=200)
+
+
+@csrf_exempt 
+def createUser(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            logger.info('error')
+            return JsonResponse({"error": "Invalid JSON"}, status=400)        
+        username = data.get('username')   
+        email = data.get('email') 
+        if username is None or email is None:
+            return JsonResponse({"error": "username and email are required"}, status=400)
+
+        try:
+            user_profile, created = User_Profile.objects.get_or_create(username=username, email=email)
+
+            return JsonResponse({"message": "User updated successfully", 
+                                 "username": user_profile.username,
+                                 "email": user_profile.email,
+                                 'user_id': user_profile.user_id}, status=200)
+        
+        except DatabaseError as e:
+            logger.error(f"DatabaseError while creating user : {str(e)}")
+            return JsonResponse({"error": "DB error when creating user"})
+        except Exception as e:
+            logger.error(f"An error occurred: {str(e)}")
+            return JsonResponse({"error": "Exception when creating user"})
+    else:
+        logger.info('error method')
+    return HttpResponse(status=405) 
 
 @csrf_exempt 
 def submitScore(request):
@@ -88,14 +121,13 @@ def submitScore(request):
 
 def showLeaderBoard(request):
     logger.debug('in show leaderbaoard')
-    latest_leaderboard = Leaderboard.objects.order_by("-xp")[:15]
-    # latest_leaderboard = Leaderboard.objects.select_related('user_id').order_by('-xp')[:15]
-    for entry in latest_leaderboard:
-        logger.info(entry.xp, entry.user_id.username, entry.user_id.user_id)
+    # latest_leaderboard = Leaderboard.objects.order_by("-xp")[:15]
+    latest_leaderboard = Leaderboard.objects.select_related('user_id').order_by('-xp')[:15]
     logger.debug(latest_leaderboard)
     results = {
         "leaderboard" : serialize_leaderboard(latest_leaderboard)
     }
+    logger.debug('in shooooow leaderbaoard')
     logger.debug(results)
     return JsonResponse(results, status=200)
 

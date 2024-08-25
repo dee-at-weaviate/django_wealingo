@@ -84,6 +84,20 @@ class QuestionsInventoryTests(TestCase):
         except json.JSONDecodeError as e:
             self.fail(f"JSON decode error: {e}")   
 
+    def test_create_user(self):
+        data = {
+            'username': 'deedee',
+            'email' : 'test@er.com'
+        }
+        url = reverse("create_user") 
+        response = self.client.post(url, data=json.dumps(data), content_type='application/json')
+        self.assertEqual(response['Content-Type'], 'application/json')  
+        try:
+            response_data = json.loads(response.content)
+            print(response_data)
+        except json.JSONDecodeError as e:
+            self.fail(f"JSON decode error: {e}")   
+
     def test_submit_score(self):
         data = {
             'user_id': str(self.userID),

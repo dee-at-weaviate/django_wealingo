@@ -44,7 +44,7 @@ def serialize_leaderboard(leaderboard):
     for position in leaderboard:
         serialize_leaderboard.append({
             'xp' : position.xp,
-            'user_id' : position.user_id.user_id,
+            'user_id' : str(position.user_id.user_id),
             'username' : position.user_id.username
         })
     return serialize_leaderboard    
