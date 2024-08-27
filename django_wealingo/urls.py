@@ -17,8 +17,12 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import include, path
+from . import views
 
 urlpatterns = [
+    path('admin/get-question-type-desc/<uuid:question_type_id>/', views.get_question_type_desc, name='get_question_type_desc'),
     path("admin/", admin.site.urls),
     path("tutorials/v1/", include("tutorials.urls")),
+    
+    
 ]
