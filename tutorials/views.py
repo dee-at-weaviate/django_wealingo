@@ -5,7 +5,7 @@ from django.template import loader
 from django.http import Http404
 from django.views import View
 from django.db.models import F
-from .models import Questions_Inventory, QuizLevel, Quiz, Leaderboard, User_Profile
+from .models import Questions_Inventory, QuizLevel, Quiz, Leaderboard, User_Profile, Questions_Category
 from django.db import IntegrityError, DatabaseError
 from .serializer import serialize_questions, serialize_quiz, serialize_leaderboard
 

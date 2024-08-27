@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const questionTypeField = document.getElementById('id_question_type');
+    const questionTypeField = document.getElementById('id_category');
     const questionTypeDescField = document.getElementById('id_question_type_desc');
 
     if (questionTypeField) {

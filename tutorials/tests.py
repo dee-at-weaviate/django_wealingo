@@ -1,6 +1,6 @@
 from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import AnonymousUser, User
-from .models import Questions_Inventory, Questions_Type, QuizLevel, Quiz, User_Profile, Leaderboard
+from .models import Questions_Inventory, Questions_Type, QuizLevel, Quiz, User_Profile, Leaderboard, Questions_Category
 from django.urls import reverse
 import json
 import uuid
@@ -8,23 +8,28 @@ import uuid
 class QuestionsInventoryTests(TestCase):
 
     def setUp(self):
-        self.qIDType = uuid.uuid4()
+        # self.qIDType = uuid.uuid4()
+        self.qCatergoryID = uuid.uuid4()
         self.qID = uuid.uuid4()  
         self.quizLevelID = uuid.uuid4()
         self.quizID = uuid.uuid4()
         self.userID = uuid.uuid4()
         self.userID2 = uuid.uuid4()
         self.factory = RequestFactory()    
-        self.questionType = Questions_Type.objects.create(question_type_id=self.qIDType,
-                                                          question_type_desc="check")
+        self.category = Questions_Category.objects.create(question_category_id=self.qCatergoryID,
+                                                          category_desc='Navigate a City')
+        # self.questionType = Questions_Type.objects.create(question_type_id=self.qIDType,
+        #                                                   question_type_desc="check")
         self.question = Questions_Inventory.objects.create(question_id=self.qID, 
+                                                           category_id=self.qCatergoryID,
                                                            answer=2, 
-                                                           image_1="yes",
-                                                           image_2="yes",
-                                                           image_3="yes",
-                                                           image_4="yes",
+                                                           option_1="yes",
+                                                           option_2="no",
+                                                           option_3="yes",
+                                                           option_4="yes",
                                                            question_text="Good Morning",
-                                                           question_type_id=self.qIDType)
+                                                           difficulty_rating=3,
+                                                           question_type='fill in the blank')
         self.quizLevel = QuizLevel.objects.create(id=self.quizLevelID,
                                                   dificulty_rating="3", level_desc="Basic")
         self.quiz = Quiz.objects.create(id=self.quizID, 
@@ -63,7 +68,7 @@ class QuestionsInventoryTests(TestCase):
             self.fail(f"JSON decode error: {e}")
 
     def test_questions_all_response(self):
-        url = reverse('questions_all', args=[self.qIDType])
+        url = reverse('questions_all', args=[self.qCatergoryID])
         response = self.client.get(url)
         self.assertEqual(response['Content-Type'], 'application/json')
         # print(response.content)

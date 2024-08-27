@@ -56,12 +56,15 @@ def serialize_questions(questions):
         serialize_questions.append({
             'question_id': question.question_id,
             'text': question.question_text,
-            'image_1': question.image_1,
-            'image_2': question.image_2,
-            'image_3': question.image_3,
-            'image_4': question.image_4,
+            'option_1': question.option_1,
+            'option_2': question.option_2,
+            'option_3': question.option_3,
+            'option_4': question.option_4,
+            'difficulty_rating': question.difficulty_rating,
+            'question_type': question.question_type,
             'answer' : question.answer,
-            'question_type_id' : question.question_type_id
+            'file_path' : question.file_path,
+            'category_id' : question.category_id
         })
     logger.debug(serialize_questions)    
     return serialize_questions
