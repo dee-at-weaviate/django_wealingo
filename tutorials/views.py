@@ -7,12 +7,12 @@ from django.views import View
 from django.db.models import F
 from .models import Questions_Inventory, QuizLevel, Quiz, Leaderboard, User_Profile, Questions_Category
 from django.db import IntegrityError, DatabaseError
-from .serializer import serialize_questions, serialize_quiz, serialize_leaderboard
+from .serializer import serialize_questions, serialize_quiz, serialize_leaderboard, serialize_generated_questions
+from .weaviate import perform_hybrid_search, generate_text_with_prompt
+from .util import create_prompt
 
 import logging
 import json
-
-# class QuestionsView(View):
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +130,45 @@ def showLeaderBoard(request):
     logger.debug('in shooooow leaderbaoard')
     logger.debug(results)
     return JsonResponse(results, status=200)
+
+def generate_questions(request, category):
+    logger.debug('in generate ques')
+    questions = [
+        {
+            "category": "Order in a restaurant",
+            "question_text": "For the first course, I'd like a pasta",
+            "translation": "Per primo, vorrei una pasta",
+            "difficulty": "3"
+        },
+        {
+            "category": "Navigate a city",
+            "question_text": "Is there a pharmacy nearby?",
+            "translation": "C'è una farmacia nelle vicinanze?",
+            "difficulty": "2"
+        }
+    ]
+    prompt = create_prompt(questions, category)    
+    try:
+        questions = generate_text_with_prompt(prompt, category, "")
+        results = {
+            "questions" : serialize_generated_questions(questions)
+        }
+        logger.debug(results)
+        return JsonResponse(results, status=200)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+def hybrid_search_view(request):
+    query = request.GET.get("query", "example query")
+    near_text = request.GET.get("near_text", "example concept")
+    
+    try:
+        results = perform_hybrid_search(query, near_text)
+        return JsonResponse(results)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+# ----------- html views
 
 def questionView(request, question_id):
     question = get_object_or_404(Questions_Inventory, pk=question_id)

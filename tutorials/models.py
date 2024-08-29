@@ -59,7 +59,7 @@ class User_Questions(models.Model):
         default=uuid.uuid4,  
         editable=False  
     )
-    question_id = models.ForeignKey(Questions_Inventory, on_delete=models.DO_NOTHING)
+    question = models.ForeignKey(Questions_Inventory, on_delete=models.DO_NOTHING)
     chosen_answer = models.IntegerField()
     actual_answer = models.IntegerField()
 

@@ -49,6 +49,23 @@ def serialize_leaderboard(leaderboard):
         })
     return serialize_leaderboard    
 
+def serialize_generated_questions(questions):
+    serialize_questions = []
+    logger.info('in serialise')
+    logger.info(len(questions))
+    for question in questions:
+        serialize_questions.append({
+            'question': question['question'],
+            'text': question['question'],
+            'instruction': question['instruction'],
+            'difficulty_rating': question['difficulty_rating'],
+            'category' : question['category'],
+            'answer' : question['answer'],
+            'category' : question['category']
+        })
+    logger.debug(serialize_questions)    
+    return serialize_questions
+
 def serialize_questions(questions):
     serialize_questions = []
     logger.info(len(questions))
