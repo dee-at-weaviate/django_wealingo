@@ -8,7 +8,7 @@ from django.db.models import F
 from .models import Questions_Inventory, QuizLevel, Quiz, Leaderboard, User_Profile, Questions_Category
 from django.db import IntegrityError, DatabaseError
 from .serializer import serialize_questions, serialize_quiz, serialize_leaderboard, serialize_generated_questions
-from .weaviate import perform_hybrid_search, generate_text_with_prompt
+from .weaviate import perform_search, generate_text_with_prompt
 from .util import create_prompt
 
 import logging
@@ -153,17 +153,17 @@ def generate_questions(request, category):
         results = {
             "questions" : serialize_generated_questions(questions)
         }
-        logger.debug(results)
+        # logger.debug(results)
         return JsonResponse(results, status=200)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-def hybrid_search_view(request):
-    query = request.GET.get("query", "example query")
-    near_text = request.GET.get("near_text", "example concept")
-    
+def search(request, query):    
     try:
-        results = perform_hybrid_search(query, near_text)
+        questions = perform_search(query, near_text="")
+        results = {
+            "questions" : serialize_generated_questions(questions)
+        }
         return JsonResponse(results)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
