@@ -5,14 +5,15 @@ from django.template import loader
 from django.http import Http404
 from django.views import View
 from django.db.models import F
-from .models import Questions_Inventory, QuizLevel, Quiz, Leaderboard, User_Profile, Questions_Category
-from django.db import IntegrityError, DatabaseError
-from .serializer import serialize_questions, serialize_quiz, serialize_leaderboard, serialize_generated_questions
+from .models import Questions_Inventory, Leaderboard, User_Profile, UserQuiz, User_Questions
+from django.db import IntegrityError, DatabaseError, transaction
+from .serializer import serialize_questions, serialize_leaderboard
 from .weaviate import perform_search, generate_text_with_prompt
 from .util import create_prompt
 
 import logging
 import json
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,20 @@ def question(request, question_id):
     }
     return JsonResponse(data, status=200)
 
-def questions_all(request, course_id):
-    logger.debug('in questions all')
-    latest_question_list = Questions_Inventory.objects.order_by("-created_at")[:5]
+# def questions_all(request, category):
+#     logger.debug('in questions all')
+#     latest_question_list = Questions_Inventory.objects.order_by("-created_at")[:5]
+#     logger.debug(len(latest_question_list))
+#     results = {
+#         "questions" : serialize_questions(latest_question_list)
+#     }
+#     logger.debug(results)
+#     return JsonResponse(results, status=200)
+
+def questionsForCategory(request, query):
+    logger.debug('in questions all: ' + query)
+    latest_question_list = Questions_Inventory.objects.filter(category=query).order_by("-created_at")[:5]
+    logger.debug(len(latest_question_list))
     logger.debug(latest_question_list)
     results = {
         "questions" : serialize_questions(latest_question_list)
@@ -38,12 +50,16 @@ def questions_all(request, course_id):
     return JsonResponse(results, status=200)
 
 def quizForLevel(request, level):
-    questions = Quiz.objects.filter(quiz_level_id=level)
-    # order_by("-created_at")[:5]
-    # filter(quiz_level_id=level)
+    if level == 2:
+        questions = Questions_Inventory.objects.filter(difficulty_rating__lt=3)
+    elif level == 4:
+        questions = Questions_Inventory.objects.filter(difficulty_rating__in=[3, 4])
+    else:
+        questions = Questions_Inventory.objects.filter(difficulty_rating__gte=5)
+    questions = questions.order_by('-created_at')[:5]
     logger.debug(questions)
     results = {
-        "questions" : serialize_quiz(questions)
+        "questions" : serialize_questions(questions)
     }
     logger.debug(results)
     return JsonResponse(results, status=200)
@@ -68,7 +84,7 @@ def createUser(request):
             return JsonResponse({"message": "User updated successfully", 
                                  "username": user_profile.username,
                                  "email": user_profile.email,
-                                 'user_id': user_profile.user_id}, status=200)
+                                 'userID': user_profile.user_id}, status=200)
         
         except DatabaseError as e:
             logger.error(f"DatabaseError while creating user : {str(e)}")
@@ -91,26 +107,35 @@ def submitScore(request):
             return JsonResponse({"error": "Invalid JSON"}, status=400)        
         user_id = data.get('user_id')
         new_score = data.get('totalScore')
+        responses = data.get('responses')
         logger.info(user_id)
         logger.info(new_score)
+        logger.info(responses)
+        
         if user_id is None or new_score is None:
             return JsonResponse({"error": "user_id and totalScore are required"}, status=400)
-        
         user_profile = get_object_or_404(User_Profile, pk=user_id)
         logger.info(user_profile)
-
         leaderboard_entry, created = Leaderboard.objects.get_or_create(
                                         user_id=user_profile,
                                         defaults={'xp': new_score} 
                                     )
-
         if not created:
             leaderboard_entry.xp = F('xp') + new_score
             leaderboard_entry.save()
             leaderboard_entry.refresh_from_db()
-
         if created:
             leaderboard_entry.save()
+            
+        userQuestionResponses = []    
+        for userQuestion in responses:             
+            userQuestionResponses.append(
+                UserQuiz(question_id=userQuestion['question_id'],
+                                    correct_answer = userQuestion['isCorrect'],
+                                    category = userQuestion.get('category', ""),
+                                    user_id=user_id))
+        logger.debug(userQuestionResponses)
+        created_questions = UserQuiz.objects.bulk_create(userQuestionResponses)    
 
         logger.info(leaderboard_entry)
         logger.info('response')
@@ -131,38 +156,123 @@ def showLeaderBoard(request):
     logger.debug(results)
     return JsonResponse(results, status=200)
 
-def generate_questions(request, category):
-    logger.debug('in generate ques')
-    questions = [
-        {
-            "category": "Order in a restaurant",
-            "question_text": "For the first course, I'd like a pasta",
-            "translation": "Per primo, vorrei una pasta",
-            "difficulty": "3"
-        },
-        {
-            "category": "Navigate a city",
-            "question_text": "Is there a pharmacy nearby?",
-            "translation": "C'è una farmacia nelle vicinanze?",
-            "difficulty": "2"
-        }
-    ]
-    prompt = create_prompt(questions, category)    
-    try:
-        questions = generate_text_with_prompt(prompt, category, "")
-        results = {
-            "questions" : serialize_generated_questions(questions)
-        }
-        # logger.debug(results)
-        return JsonResponse(results, status=200)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+@csrf_exempt 
+def generate_questions(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            # logger.info(data)
+        except json.JSONDecodeError:
+            logger.info('error')
+            return JsonResponse({"error": "Invalid JSON"}, status=400)        
+        userID = data.get('user_id', None)
+        category = data.get('category', None)
+        query = data.get('query', None)
+        
+        logger.info(userID)
+        logger.info(category)
+        logger.info(query)
+        
+        logger.debug('in generate ques:')
+        logger.debug(userID)
+        userQuizQuestions = []
+        
+        if userID:
+            try:
+                user_profile = User_Profile.objects.get(pk=userID)
+                userQuizQuestions = _getQuestions(userID, category)
+            except User_Profile.DoesNotExist:
+                user_profile = None
+        else:
+            user_profile = None        
+        
+        prompt = create_prompt(userQuizQuestions, category, query)    
+        try:
+            response = generate_text_with_prompt(prompt, category, "")
+            questions = []
+            for question in response:             
+                questions.append(
+                    Questions_Inventory(question_text=question['question'],
+                                        options = question.get('options', ""),
+                                        question_type=question.get('question_type', "standard question"),
+                                        answer=question['answer'],
+                                        difficulty_rating=question.get('difficulty_rating', ""),
+                                        category=question.get('category', ""),
+                                        instruction=question.get('instruction', "")))
+            logger.debug(questions)
+            
+            with transaction.atomic():
+                created_questions = Questions_Inventory.objects.bulk_create(questions)
+                if user_profile is not None:
+                    user_questions = [
+                        User_Questions(question=question, user=user_profile) for question in created_questions
+                    ]
+                    User_Questions.objects.bulk_create(user_questions)
+            
+            results = {
+                "questions" : response
+            }
+            logger.debug(response)
+            return JsonResponse(results, status=200)
+        except Exception as e:
+            print(e)
+            return JsonResponse({"error": str(e)}, status=500)
+ 
+ 
+def _getQuestions(userID, category):
+    questions = []
+    userQuiz = UserQuiz.objects.filter(category=category, user_id=userID).order_by("-created_at")[:5]
+    if userQuiz.exists():
+        question_ids = userQuiz.values_list('question_id', flat=True)
+        questions = Questions_Inventory.objects.filter(question_id__in=question_ids)
+    serialized = serialize_questions(questions)
+    # logger.debug(serialized)
+    return serialized    
+        
+    # questions = [
+    #     {
+    #         "category": "Order in a restaurant",
+    #         "question_text": "For the first course, I'd like a pasta",
+    #         "translation": "Per primo, vorrei una pasta",
+    #         "difficulty": "3"
+    #     },
+    #     {
+    #         "category": "Navigate a city",
+    #         "question_text": "Is there a pharmacy nearby?",
+    #         "translation": "C'è una farmacia nelle vicinanze?",
+    #         "difficulty": "2"
+    #     }
+    # ]
+    
+        
+# def _convert(json):
+#     questions = []
+#     try:
+#         for question in json:             
+#             questions.append(
+#                 Questions_Inventory(question_text=question['question'],
+#                                     options = question.get('options', ""),
+#                                     question_type=question.get('question_type', "standard question"),
+#                                     answer=question['answer'],
+#                                     difficulty_rating=question.get('difficulty_rating', ""),
+#                                     category=question.get('category', ""),
+#                                     instruction=question.get('instruction', "")))
+
+#         logger.debug(questions)
+#         with transaction.atomic():
+#             created_questions = Questions_Inventory.objects.bulk_create(questions)
+#             user_questions = [
+#                 User_Questions(question=question) for question in created_questions
+#             ]
+#             User_Questions.objects.bulk_create(user_questions) 
+#     except Exception as e:    
+#         print(e)    
 
 def search(request, query):    
     try:
         questions = perform_search(query, near_text="")
         results = {
-            "questions" : serialize_generated_questions(questions)
+            "questions" : questions
         }
         return JsonResponse(results)
     except Exception as e:

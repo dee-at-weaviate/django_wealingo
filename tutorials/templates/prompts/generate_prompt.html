@@ -4,13 +4,13 @@ the user got the following questions wrong:
 {% for question in questions %}
 
 "category": {{ question.category }},
-"question": {{ question.question_text }},
-"answer": {{ question.translation }},
-"difficulty_rating": {{ question.difficulty }},
+"question": {{ question.question }},
+"answer": {{ question.answer }},
+"difficulty_rating": {{ question.difficulty_rating }},
 
 {% endfor %}
 
-Create two new questions that will help the user improve their Italian and learn how to talk about {{query}}. 
+Create two new questions that will help the user improve their Italian and learn how to talk about {{query}} in the category {{category}}. 
 The questions should be personalized to the mistakes above. 
 The difficulty raitng of the questions should be based on the previous failed attempts of the user.
 The questions shouldn't be a repeat of what is already provided in the input. 
@@ -18,8 +18,8 @@ The questions shouldn't be a repeat of what is already provided in the input.
 
 Use the following format, where its valid json:
 
-"question": [the phrase the user needs to translate, do not include any instructions],
-"answer": [the correct answer to the question],
+"question": [the phrase the user needs to translate, in english, do not include any instructions],
+"answer": [the correct answer to the question, in Italian],
 "instruction": [tell the user some points to remember in this translation],
 "difficulty_rating": [difficulty rating of the translation],
 "category": [category of the question],

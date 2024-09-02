@@ -1,5 +1,5 @@
 from django import forms
-from .models import Questions_Inventory, User_Profile, Questions_Type
+from .models import Questions_Inventory, User_Profile
 
 class QuestionsInventoryForm(forms.ModelForm):
     # Include related model fields in the form
@@ -7,8 +7,7 @@ class QuestionsInventoryForm(forms.ModelForm):
 
     class Meta:
         model = Questions_Inventory
-        fields = ['question_text', 'question_type', 'category', 'option_1', 'option_2', 
-                  'option_3', 'option_4', 'answer', 'difficulty_rating', 'file_path']
+        fields = ['question_text', 'category', 'options', 'answer', 'difficulty_rating', 'file_path']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

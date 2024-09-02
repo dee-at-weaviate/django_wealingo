@@ -1,6 +1,8 @@
 from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import AnonymousUser, User
-from .models import Questions_Inventory, Questions_Type, QuizLevel, Quiz, User_Profile, Leaderboard, Questions_Category
+from .models import Questions_Inventory, User_Profile, Leaderboard, UserQuiz
+from .util import create_prompt
+from .views import generate_questions
 from django.urls import reverse
 import json
 import uuid
@@ -11,31 +13,43 @@ class QuestionsInventoryTests(TestCase):
         # self.qIDType = uuid.uuid4()
         self.qCatergoryID = uuid.uuid4()
         self.qID = uuid.uuid4()  
-        self.quizLevelID = uuid.uuid4()
+        # self.quizLevelID = uuid.uuid4()
         self.quizID = uuid.uuid4()
         self.userID = uuid.uuid4()
         self.userID2 = uuid.uuid4()
         self.factory = RequestFactory()    
-        self.category = Questions_Category.objects.create(question_category_id=self.qCatergoryID,
-                                                          category_desc='Navigate a City')
+        # self.category = Questions_Category.objects.create(question_category_id=self.qCatergoryID,
+        #                                                   category_desc='Navigate a City')
         # self.questionType = Questions_Type.objects.create(question_type_id=self.qIDType,
         #                                                   question_type_desc="check")
         self.question = Questions_Inventory.objects.create(question_id=self.qID, 
-                                                           category_id=self.qCatergoryID,
-                                                           answer=2, 
-                                                           option_1="yes",
-                                                           option_2="no",
-                                                           option_3="yes",
-                                                           option_4="yes",
+                                                           category='Navigate a City',
+                                                           answer="yes no", 
+                                                           options="yes",
+                                                        #    option_2="no",
+                                                        #    option_3="yes",
+                                                        #    option_4="yes",
                                                            question_text="Good Morning",
-                                                           difficulty_rating=3,
+                                                           instruction="instr",
+                                                           difficulty_rating=2,
                                                            question_type='fill in the blank')
-        self.quizLevel = QuizLevel.objects.create(id=self.quizLevelID,
-                                                  dificulty_rating="3", level_desc="Basic")
-        self.quiz = Quiz.objects.create(id=self.quizID, 
-                                        question_text="Text", image_1="ans 1", image_2="ans 2",
-                                        image_3="ans 3", image_4="ans 4", answer=2,
-                                        quiz_level_id= self.quizLevelID)
+        self.question2 = Questions_Inventory.objects.create(question_id=uuid.uuid4(), 
+                                                           category='Order in a restaurant',
+                                                           answer="yes no", 
+                                                           options="yes",
+                                                        #    option_2="no",
+                                                        #    option_3="yes",
+                                                        #    option_4="yes",
+                                                           question_text="Appetizer",
+                                                           instruction="instr",
+                                                           difficulty_rating=2,
+                                                           question_type='fill in the blank')
+        # self.quizLevel = QuizLevel.objects.create(id=self.quizLevelID,
+        #                                           dificulty_rating="3", level_desc="Basic")
+        # self.quiz = Quiz.objects.create(id=self.quizID, 
+        #                                 question_text="Text", image_1="ans 1", image_2="ans 2",
+        #                                 image_3="ans 3", image_4="ans 4", answer=2,
+        #                                 quiz_level_id= self.quizLevelID)
         self.userProfile = User_Profile.objects.create(user_id=self.userID, 
                                                username="deepT",
                                                email="test.com")
@@ -49,10 +63,7 @@ class QuestionsInventoryTests(TestCase):
     def test_get_question_success(self):
         question = Questions_Inventory.objects.get(
             question_id=self.qID)
-        # print(question.question_text)
-        # q2 = question.getQuestion(id=self.qID)
-        # print(question.getQuestion(id=self.qID))
-        self.assertEqual(self.question.answer, 2)
+        self.assertEqual(question.answer, "yes no")
 
 # class QuestionsViewTests(TestCase):
     def test_question_response(self):
@@ -68,24 +79,23 @@ class QuestionsInventoryTests(TestCase):
             self.fail(f"JSON decode error: {e}")
 
     def test_questions_all_response(self):
-        url = reverse('questions_all', args=[self.qCatergoryID])
+        url = reverse('questions_all', args=["Order in a restaurant"])
         response = self.client.get(url)
         self.assertEqual(response['Content-Type'], 'application/json')
-        # print(response.content)
         try:
             response_data = json.loads(response.content)
             print(response_data)
-            # self.assertEqual(response_data['answer'], 2)
         except json.JSONDecodeError as e:
             self.fail(f"JSON decode error: {e}")   
 
     def test_quiz_level(self):
-        url = reverse("quiz_for_level", args=[self.quizLevelID])
+        url = reverse("quiz_for_level", args=[2])
+        print(url)
         response = self.client.get(url)
         self.assertEqual(response['Content-Type'], 'application/json')  
         try:
             response_data = json.loads(response.content)
-            print(response_data)
+            # print(response_data)
         except json.JSONDecodeError as e:
             self.fail(f"JSON decode error: {e}")   
 
@@ -104,9 +114,11 @@ class QuestionsInventoryTests(TestCase):
             self.fail(f"JSON decode error: {e}")   
 
     def test_submit_score(self):
+        responses = [{'question_id': str(self.qID), 'isCorrect': False}] 
         data = {
             'user_id': str(self.userID),
-            'totalScore' : 12
+            'totalScore' : 12,
+            'responses' : responses
         }
         url = reverse("submit_score") 
         response = self.client.post(url, data=json.dumps(data), content_type='application/json')
@@ -127,4 +139,49 @@ class QuestionsInventoryTests(TestCase):
             print(response_data)
         except json.JSONDecodeError as e:
             self.fail(f"JSON decode error: {e}")   
+
+    # def test_prompt(self):
+    #     questions = [
+    #         {
+    #             "category": "Order in a restaurant",
+    #             "question_text": "For the first course, I'd like a pasta",
+    #             "translation": "Per primo, vorrei una pasta",
+    #             "difficulty": "3"
+    #         },
+    #         {
+    #             "category": "Navigate a city",
+    #             "question_text": "Is there a pharmacy nearby?",
+    #             "translation": "C'è una farmacia nelle vicinanze?",
+    #             "difficulty": "2"
+    #         }
+    #     ]
+    #     prompt = create_prompt(questions, 'order food')
+    #     print(prompt)
+
+    # def test_genAI(self):
+    #     UserQuiz.objects.create(question_id=self.qID, category='Navigate a City', correct_answer=False, user_id=self.userID)
+    #     url = reverse('generate_questions', args=['Navigate a City', self.userID ])
+    #     response = self.client.get(url)
+    #     self.assertEqual(response['Content-Type'], 'application/json')
+    #     try:
+    #         response_data = json.loads(response.content)
+    #         print('back in test')
+    #         print(response_data)
+    #     except json.JSONDecodeError as e:
+    #         self.fail(f"JSON decode error: {e}")  
+            
+
+    # def test_search(self):
+    #     url = reverse('search', args=['Buy hat'])
+    #     response = self.client.get(url)
+    #     self.assertEqual(response['Content-Type'], 'application/json')
+    #     try:
+    #         response_data = json.loads(response.content)
+    #         print('back in test')
+    #         print(response)
+    #         # print(response_data[0])
+    #     except json.JSONDecodeError as e:
+    #         self.fail(f"JSON decode error: {e}")           
+
+
 

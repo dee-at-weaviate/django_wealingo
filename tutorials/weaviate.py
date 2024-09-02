@@ -12,8 +12,9 @@ def perform_search(query, near_text, limit=5):
     {
       Get {
         ConversationalStatements(
-          nearText: {
-            concepts: ["%s"]
+          hybrid: {
+            query: "%s"
+            alpha: 0.5
           }
           limit: %d
         ) {
